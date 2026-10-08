@@ -67,8 +67,9 @@ st.markdown(f"""
 """, unsafe_allow_html=True)
 
 
-@st.cache_data(ttl=3600)
-def load():
+@st.cache_data
+def load(mtime):
+    # mtime is part of the cache key, so a new data file is picked up immediately
     return json.loads(SUMMARY.read_text(encoding="utf-8"))
 
 
@@ -82,7 +83,7 @@ if not SUMMARY.exists():
     st.info("Results will appear here after the first data refresh.")
     st.stop()
 
-S = load()
+S = load(SUMMARY.stat().st_mtime)
 META = S["meta"]
 MIN_CELL, MIN_GROUP = S["rules"]["min_cell"], S["rules"]["min_group"]
 DIMS = {"province": "Province", "gender": "Gender", "age_group": "Age group"}
