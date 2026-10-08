@@ -1,0 +1,8 @@
+# Never commit raw KoBo exports or secrets
+*.csv
+*.xlsx
+submissions*.json
+asset*.json
+.env
+.streamlit/secrets.toml
+__pycache__/
