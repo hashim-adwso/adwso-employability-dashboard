@@ -13,8 +13,9 @@ KoBoToolbox ──(API token, GitHub secret)──► aggregate.py ──► dat
 * `aggregate.py` reads only the fields needed for counting. Names, phone numbers, GPS, photos, enumerator
   details, districts/villages and free-text answers are never read or saved.
 * Raw submissions exist only in memory during the run; they are never written to the repository.
-* Any figure based on 1–4 graduates is shown as "<5" (with a second figure hidden where needed so it cannot be
-  worked out from the total). Breakdown groups with fewer than 10 graduates are merged into "Other (combined)".
+* Groups (e.g. provinces) are never merged. Any figure based on 1–4 graduates is shown as "<5" (with a second
+  figure hidden where needed so it cannot be worked out from the total). For any group of fewer than 10 graduates
+  only its size is shown, never its answers. A filter selection is shown only when at least 10 graduates match.
 * Submissions marked **Not approved** in KoBo, and interviews without consent, are excluded.
 * `app.py` has no KoBo access at all – it only reads `data/summary.json`.
 
@@ -40,7 +41,7 @@ A KoBo API token gives full access to the account it belongs to. To limit risk:
 3. Each daily data refresh commits a new `summary.json`, and the app updates automatically.
 
 ## Changing the rules
-In `aggregate.py`: `MIN_CELL` (default 5) and `MIN_GROUP` (default 10). Indicators are listed in `INDICATORS`.
+In `aggregate.py`: `MIN_CELL` (default 5) and `MIN_GROUP` (default 10). The logo is `assets/adwso_logo.png`. Indicators are listed in `INDICATORS`.
 If the KoBo form changes (new options or questions), labels update automatically from the form; a brand-new
 question must be added to `KEEP` and `INDICATORS` before it appears.
 

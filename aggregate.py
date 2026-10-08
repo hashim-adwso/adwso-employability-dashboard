@@ -26,7 +26,7 @@ ASSET_UID = os.environ.get("KOBO_ASSET_UID", "a4Pwb3bVXuNDAub4dRBNia")
 OUT = os.path.join(os.path.dirname(os.path.abspath(__file__)), "data", "summary.json")
 
 MIN_CELL = 5    # any count from 1 to 4 is hidden ("<5")
-MIN_GROUP = 10  # a breakdown group needs at least 10 respondents to be shown on its own
+MIN_GROUP = 10  # a filtered view (e.g. one province) needs at least 10 respondents to show results
 
 # Only these fields are read from each submission. Everything else is discarded.
 KEEP = {
@@ -169,15 +169,25 @@ def build_labels(asset):
 
 
 # ---------------------------------------------------------------- suppression
-def suppress_cells(counts, multi):
-    """counts: {code: int}. Returns {code: int|None}; None means 1–4 (shown as '<5')."""
+def suppress_cells(counts, multi, n):
+    """counts: {code: int}. Returns {code: int|None}; None is shown as '<5' (hidden).
+
+    - A group with fewer than MIN_GROUP respondents shows its size only: every answer is hidden.
+    - Any count from 1 to 4 is hidden.
+    - Single-choice questions: if only one answer would be hidden, a second one is hidden too, so the
+      hidden value cannot be worked out by subtracting the others from the group total.
+    """
+    if n < MIN_GROUP:
+        return {k: None for k in counts}
     out = {k: (None if 0 < v < MIN_CELL else v) for k, v in counts.items()}
     if not multi:
         hidden = [k for k, v in out.items() if v is None]
-        shown = sorted([(v, k) for k, v in out.items() if v], reverse=False)
-        # Secondary suppression: a single hidden cell could be worked out from the total.
-        if len(hidden) == 1 and shown:
-            out[shown[0][1]] = None
+        if len(hidden) == 1:
+            shown = sorted((v, k) for k, v in out.items() if v)
+            if shown:
+                out[shown[0][1]] = None
+            else:  # every other answer is 0 – hide those zeros as well
+                out = {k: None for k in out}
     return out
 
 
@@ -193,27 +203,18 @@ def tabulate(rows, field, multi, codes):
 
 
 def group_rows(rows, dim, order):
-    """Split rows by dimension; groups below MIN_GROUP are merged into 'Other (combined)'."""
-    groups = {g: [r for r in rows if r.get(dim) == g] for g in order}
-    groups = {g: rs for g, rs in groups.items() if rs}
-    small = {g for g, rs in groups.items() if len(rs) < MIN_GROUP}
-    # Keep merging the next-smallest group until the combined group is large enough,
-    # so no small group can be worked out by subtraction.
-    while small and sum(len(groups[g]) for g in small) < MIN_GROUP:
-        rest = sorted((len(rs), g) for g, rs in groups.items() if g not in small)
-        if not rest:
-            break
-        small.add(rest[0][1])
-    result = [(g, groups[g]) for g in order if g in groups and g not in small]
-    if small:
-        merged = [r for g in small for r in groups[g]]
-        if len(merged) >= MIN_GROUP:
-            result.append(("_other", merged))
-    return result
+    """Split rows by dimension. Every group is kept separately – groups are never merged.
+    Small groups are still protected because every count of 1–4 is shown only as '<5'.
+    For vocation (many small groups) only vocations with at least MIN_CELL respondents are listed."""
+    groups = [(g, [r for r in rows if r.get(dim) == g]) for g in order]
+    groups = [(g, rs) for g, rs in groups if rs]
+    if dim == "vocation":
+        groups = [(g, rs) for g, rs in groups if len(rs) >= MIN_CELL]
+    return groups
 
 
 def summarise(rows, field, multi, codes):
-    return {"n": len(rows), "counts": suppress_cells(tabulate(rows, field, multi, codes), multi)}
+    return {"n": len(rows), "counts": suppress_cells(tabulate(rows, field, multi, codes), multi, len(rows))}
 
 
 # ---------------------------------------------------------------- main
@@ -250,26 +251,44 @@ def main():
         "age_group": dict(AGE_GROUPS),
         "vocation": dict(choices.get(field_list.get("vocation", ""), [])),
     }
-    for d in dim_labels:
-        dim_labels[d]["_other"] = "Other (combined)"
 
-    indicators = {}
+    def build_indicators(sub_rows, fixed):
+        out = {}
+        for key, field, lst, multi, base, base_desc, title, page in INDICATORS:
+            opts = choices.get(lst or field_list.get(field, ""), [])
+            codes = [c for c, _ in opts]
+            base_rows = [r for r in sub_rows if (base is None or base(r))]
+            if len(base_rows) < MIN_GROUP:
+                out[key] = {"too_few": True, "n": len(base_rows)}
+                continue
+            ind = {"too_few": False, "all": summarise(base_rows, field, multi, codes), "by": {}}
+            dims = [d for d in BREAKDOWNS if d not in fixed] + (["vocation"] if key in VOCATION_INDICATORS else [])
+            for d in dims:
+                ind["by"][d] = [{"group": g, "label": dim_labels[d].get(g, g), **summarise(rs, field, multi, codes)}
+                                for g, rs in group_rows(base_rows, d, dim_order[d])]
+            out[key] = ind
+        return out
+
+    meta = {}
     for key, field, lst, multi, base, base_desc, title, page in INDICATORS:
         opts = choices.get(lst or field_list.get(field, ""), [])
-        codes = [c for c, _ in opts]
-        base_rows = [r for r in rows if (base is None or base(r))]
-        if len(base_rows) < MIN_GROUP:
-            indicators[key] = {"title": title, "page": page, "base": base_desc, "multi": multi,
-                               "options": [], "too_few": True, "n": None}
-            continue
-        ind = {"title": title, "page": page, "base": base_desc, "multi": multi,
-               "options": [{"code": c, "label": l} for c, l in opts], "too_few": False,
-               "all": summarise(base_rows, field, multi, codes), "by": {}}
-        dims = BREAKDOWNS + (["vocation"] if key in VOCATION_INDICATORS else [])
-        for d in dims:
-            ind["by"][d] = [{"group": g, "label": dim_labels[d].get(g, g), **summarise(rs, field, multi, codes)}
-                            for g, rs in group_rows(base_rows, d, dim_order[d])]
-        indicators[key] = ind
+        meta[key] = {"title": title, "page": page, "base": base_desc, "multi": multi,
+                     "options": [{"code": c, "label": l} for c, l in opts]}
+
+    # Pre-computed views for every filter combination: "province|gender|age_group", '*' = all.
+    present = {d: [g for g in dim_order[d] if any(r.get(d) == g for r in rows)] for d in BREAKDOWNS}
+    views, view_n = {}, {}
+    for p in ["*"] + present["province"]:
+        for g in ["*"] + present["gender"]:
+            for ag in ["*"] + present["age_group"]:
+                sub = [r for r in rows if (p == "*" or r.get("province") == p)
+                       and (g == "*" or r.get("gender") == g) and (ag == "*" or r.get("age_group") == ag)]
+                vkey = f"{p}|{g}|{ag}"
+                view_n[vkey] = len(sub)
+                if len(sub) < MIN_GROUP:
+                    continue
+                fixed = {d for d, v in zip(BREAKDOWNS, (p, g, ag)) if v != "*"}
+                views[vkey] = build_indicators(sub, fixed)
 
     months = sorted(r["_month"] for r in rows if r["_month"])
     summary = {
@@ -280,12 +299,15 @@ def main():
         "n_no_consent": no_consent if no_consent >= MIN_CELL or no_consent == 0 else None,
         "rules": {"min_cell": MIN_CELL, "min_group": MIN_GROUP},
         "dimensions": {"province": "Province", "gender": "Gender", "age_group": "Age group", "vocation": "Vocation"},
-        "indicators": indicators,
+        "filters": {d: [{"code": c, "label": dim_labels[d].get(c, c)} for c in present[d]] for d in BREAKDOWNS},
+        "meta": meta,
+        "view_n": view_n,
+        "views": views,
     }
     os.makedirs(os.path.dirname(a.out), exist_ok=True)
     with open(a.out, "w", encoding="utf-8") as f:
-        json.dump(summary, f, ensure_ascii=False, indent=1)
-    print(f"Wrote {a.out}: {len(rows)} respondents, {len(indicators)} indicators.")
+        json.dump(summary, f, ensure_ascii=False, separators=(",", ":"))
+    print(f"Wrote {a.out}: {len(rows)} respondents, {len(views)} filter views.")
 
 
 if __name__ == "__main__":
