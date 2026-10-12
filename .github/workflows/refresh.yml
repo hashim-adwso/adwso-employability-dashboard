@@ -2,7 +2,7 @@ name: Refresh dashboard data
 
 on:
   schedule:
-    - cron: "17 2 * * *"   # every day at 02:17 UTC (06:47 Kabul time)
+    - cron: "17 */6 * * *"   # back-up snapshot every 6 hours (GitHub may start it late)
   workflow_dispatch:        # allows a manual "Run workflow" button
 
 permissions:
