@@ -251,7 +251,7 @@ with st.container(border=True, key="card_status"):
     if SOURCE == "live":
         dot, how = GREEN, f"Live from KoBo · updates automatically every {LIVE_TTL // 60} minutes"
     else:
-        dot, how = WHEAT, "Daily snapshot" + (" · live connection to KoBo is not available right now" if LIVE_ERROR else "")
+        dot, how = WHEAT, "Back-up snapshot (refreshed every 6 hours)" + (" · live connection to KoBo is not available right now" if LIVE_ERROR else "")
     l.markdown(f"<div class='ep-status'><span class='ep-dot' style='background:{dot}'></span>"
                f"Data last fetched: <b>{UPDATED}</b> · {how}<br>{counts_txt}</div>", unsafe_allow_html=True)
     r.button("↻ Refresh data", on_click=do_refresh, width="stretch", disabled=not TOKEN,
@@ -714,8 +714,8 @@ D. Another field · E. Not working.
 quality review are excluded. The total in KoBo can therefore be slightly higher than the number shown here.
 
 **How up to date it is.** The dashboard reads the interviews directly from KoBo and updates itself every
-{LIVE_TTL // 60} minutes; anyone can press **Refresh data** to fetch the latest interviews at once. A daily
-snapshot is used as a back-up if KoBo cannot be reached.
+{LIVE_TTL // 60} minutes; anyone can press **Refresh data** to fetch the latest interviews at once. A snapshot
+refreshed every 6 hours is used as a back-up if KoBo cannot be reached.
 
 **Privacy.** This dashboard shows totals only. It never contains names, phone numbers, locations below province
 level, photos or individual answers. Any figure based on fewer than {MIN_CELL} graduates is shown as
