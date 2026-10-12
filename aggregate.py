@@ -7,6 +7,9 @@ aggregates them, applies small-cell suppression and writes data/summary.json.
 No names, phone numbers, GPS, photos, enumerator details, districts/villages,
 free-text answers or individual records are ever written to disk.
 
+The public app (app.py) also imports build_summary()/fetch() to refresh live in memory when the
+KOBO_TOKEN Streamlit secret is set; nothing is written to disk in that case.
+
 Usage (normally run by the GitHub Actions workflow):
     KOBO_TOKEN=... python aggregate.py
 Offline test:
@@ -47,6 +50,12 @@ PATHWAY_LABELS = [
 ]
 AGE_GROUPS = [("14-17", "14–17 years"), ("18+", "18 years and above")]
 
+EARNING_STATUS = [
+    ("regular", "Earning regularly (every week or month)"),
+    ("occasional", "Earning occasionally"),
+    ("none", "Not earning from the trade"),
+]
+
 EARNERS = lambda r: r.get("is_earning") == "1"
 # key, field, list(None = from form), multi, base filter, base description, title, page
 INDICATORS = [
@@ -56,6 +65,8 @@ INDICATORS = [
      "How often they earn from the trade", "income"),
     ("is_earning", "is_earning", "_yesno", False, None, "All respondents",
      "Earning any income from the trained vocation", "income"),
+    ("earning_status", "earning_status", "_earning_status", False, None, "All respondents",
+     "Earning from the trained vocation – regularly, occasionally or not at all", "income"),
     ("trade_income", "trade_income", None, False, lambda r: r.get("pathway") == "other_field",
      "Path D – working in another field", "Still earning from the trade alongside other work", "income"),
     ("monthly_income", "monthly_income", None, False, EARNERS, "Respondents earning from their trade",
@@ -106,7 +117,7 @@ INDICATORS = [
      "Monitor's assessment of employability", "outlook"),
 ]
 BREAKDOWNS = ["province", "gender", "age_group"]
-VOCATION_INDICATORS = {"pathway", "is_earning"}
+VOCATION_INDICATORS = {"pathway", "is_earning", "earning_status"}
 
 
 # ---------------------------------------------------------------- data access
@@ -142,7 +153,9 @@ def clean(sub):
         if name in KEEP and v not in (None, ""):
             out[name] = str(v)
     out["_not_approved"] = status == "validation_status_not_approved"
-    out["_month"] = str(sub.get("_submission_time") or sub.get("today") or "")[:7]
+    out["_day"] = str(sub.get("_submission_time") or sub.get("today") or "")[:10]
+    freq = out.get("earning_freq", "")
+    out["earning_status"] = {"yes_regular": "regular", "yes_occasional": "occasional"}.get(freq, "none")
     try:
         out["age_group"] = "14-17" if int(float(out.pop("age", "0"))) < 18 else "18+"
     except ValueError:
@@ -165,6 +178,7 @@ def build_labels(asset):
     choices["_pathway"] = PATHWAY_LABELS
     choices["_yesno"] = [("1", "Yes"), ("0", "No")]
     choices["_age_group"] = AGE_GROUPS
+    choices["_earning_status"] = EARNING_STATUS
     return choices, field_list
 
 
@@ -218,26 +232,26 @@ def summarise(rows, field, multi, codes):
 
 
 # ---------------------------------------------------------------- main
-def main():
-    ap = argparse.ArgumentParser()
-    ap.add_argument("--asset")
-    ap.add_argument("--data")
-    ap.add_argument("--out", default=OUT)
-    a = ap.parse_args()
-    token = os.environ.get("KOBO_TOKEN", "")
-    if not (a.asset and a.data) and not token:
-        sys.exit("Set KOBO_TOKEN (or pass --asset and --data for an offline test).")
+class TooFew(Exception):
+    pass
 
-    choices, field_list = build_labels(load_asset(a.asset, token))
-    raw = load_submissions(a.data, token)
+
+def fetch(token):
+    """Download the form definition and all submissions (kept in memory only)."""
+    return load_asset(None, token), load_submissions(None, token)
+
+
+def build_summary(asset, raw):
+    """Aggregate raw submissions into the public summary dict (no individual records)."""
+    choices, field_list = build_labels(asset)
     rows = [clean(s) for s in raw]
-    raw = None  # drop raw records from memory
+    n_kobo = len(rows)
     excluded_review = sum(r["_not_approved"] for r in rows)
     rows = [r for r in rows if not r["_not_approved"]]
     no_consent = sum(r.get("consent_ok") != "1" for r in rows)
     rows = [r for r in rows if r.get("consent_ok") == "1"]
     if len(rows) < MIN_GROUP:
-        sys.exit(f"Only {len(rows)} usable submissions – too few to publish safely. Nothing written.")
+        raise TooFew(f"Only {len(rows)} usable submissions – too few to publish safely.")
 
     dim_order = {
         "province": [c for c, _ in choices.get(field_list.get("province", ""), [])],
@@ -290,10 +304,13 @@ def main():
                 fixed = {d for d, v in zip(BREAKDOWNS, (p, g, ag)) if v != "*"}
                 views[vkey] = build_indicators(sub, fixed)
 
-    months = sorted(r["_month"] for r in rows if r["_month"])
+    days = sorted(r["_day"] for r in rows if r["_day"])
+    now = dt.datetime.now(dt.timezone.utc)
     summary = {
-        "generated": dt.datetime.now(dt.timezone.utc).strftime("%Y-%m-%d %H:%M UTC"),
-        "period": [months[0], months[-1]] if months else None,
+        "generated": now.strftime("%Y-%m-%d %H:%M UTC"),
+        "generated_iso": now.isoformat(timespec="seconds"),
+        "period": [days[0], days[-1]] if days else None,
+        "n_kobo": n_kobo,
         "n_used": len(rows),
         "n_excluded_review": excluded_review if excluded_review >= MIN_CELL or excluded_review == 0 else None,
         "n_no_consent": no_consent if no_consent >= MIN_CELL or no_consent == 0 else None,
@@ -304,10 +321,26 @@ def main():
         "view_n": view_n,
         "views": views,
     }
+    return summary
+
+
+def main():
+    ap = argparse.ArgumentParser()
+    ap.add_argument("--asset")
+    ap.add_argument("--data")
+    ap.add_argument("--out", default=OUT)
+    a = ap.parse_args()
+    token = os.environ.get("KOBO_TOKEN", "")
+    if not (a.asset and a.data) and not token:
+        sys.exit("Set KOBO_TOKEN (or pass --asset and --data for an offline test).")
+    try:
+        summary = build_summary(load_asset(a.asset, token), load_submissions(a.data, token))
+    except TooFew as e:
+        sys.exit(f"{e} Nothing written.")
     os.makedirs(os.path.dirname(a.out), exist_ok=True)
     with open(a.out, "w", encoding="utf-8") as f:
         json.dump(summary, f, ensure_ascii=False, separators=(",", ":"))
-    print(f"Wrote {a.out}: {len(rows)} respondents, {len(views)} filter views.")
+    print(f"Wrote {a.out}: {summary['n_used']} respondents, {len(summary['views'])} filter views.")
 
 
 if __name__ == "__main__":

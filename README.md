@@ -17,7 +17,10 @@ KoBoToolbox ──(API token, GitHub secret)──► aggregate.py ──► dat
   figure hidden where needed so it cannot be worked out from the total). For any group of fewer than 10 graduates
   only its size is shown, never its answers. A filter selection is shown only when at least 10 graduates match.
 * Submissions marked **Not approved** in KoBo, and interviews without consent, are excluded.
-* `app.py` has no KoBo access at all – it only reads `data/summary.json`.
+* **Live mode (optional, recommended):** if the Streamlit secret `KOBO_TOKEN` is set, `app.py` downloads the
+  submissions itself, aggregates them in memory with the same rules (`aggregate.build_summary`) and keeps only the
+  totals. It refreshes automatically every 30 minutes and has a **Refresh data** button (at most one refresh per
+  minute). Without the secret, or if KoBo cannot be reached, it uses `data/summary.json`.
 
 ## One-time setup (about 20 minutes)
 
@@ -37,8 +40,10 @@ A KoBo API token gives full access to the account it belongs to. To limit risk:
 
 ### 3. Deploy on Streamlit Community Cloud
 1. Go to share.streamlit.io → **Create app** → choose the repository, branch `main`, file `app.py`.
-2. Deploy. No Streamlit secrets are needed – the app holds no credentials.
-3. Each daily data refresh commits a new `summary.json`, and the app updates automatically.
+2. Deploy.
+3. For live data: **Manage app → Settings → Secrets**, add `KOBO_TOKEN = "…"` (the same read-only key) and save.
+   Streamlit secrets are kept on the server and are never shown to viewers.
+4. The GitHub Action still refreshes `data/summary.json` every 6 hours as a back-up snapshot.
 
 ## Changing the rules
 In `aggregate.py`: `MIN_CELL` (default 5) and `MIN_GROUP` (default 10). The logo is `assets/adwso_logo.png`. Indicators are listed in `INDICATORS`.
