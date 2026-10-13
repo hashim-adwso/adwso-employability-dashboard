@@ -56,6 +56,10 @@ EARNING_STATUS = [
     ("none", "Not earning from the trade"),
 ]
 
+# Q23 "Don't know" is merged into "No": it is usually only a handful of answers, and keeping it separate forced
+# the much larger "Yes" or "No" figure to be hidden as well (secondary suppression).
+POST_SUPPORT = [("yes", "Yes"), ("no", "No or don't know")]
+
 EARNERS = lambda r: r.get("is_earning") == "1"
 # key, field, list(None = from form), multi, base filter, base description, title, page
 INDICATORS = [
@@ -102,7 +106,7 @@ INDICATORS = [
     ("toolkit_how", "toolkit_how", None, True,
      lambda r: r.get("toolkit_use") in ("regularly", "sometimes", "rarely"), "Respondents using the toolkit",
      "How the toolkit is used", "support"),
-    ("post_support", "post_support", None, False, None, "All respondents",
+    ("post_support", "post_support", "_post_support", False, None, "All respondents",
      "Received support after the training", "support"),
     ("post_support_type", "post_support_type", None, True, lambda r: r.get("post_support") == "yes",
      "Respondents who received support", "Type of support received", "support"),
@@ -154,6 +158,8 @@ def clean(sub):
             out[name] = str(v)
     out["_not_approved"] = status == "validation_status_not_approved"
     out["_day"] = str(sub.get("_submission_time") or sub.get("today") or "")[:10]
+    if out.get("post_support") == "dont_know":
+        out["post_support"] = "no"
     freq = out.get("earning_freq", "")
     out["earning_status"] = {"yes_regular": "regular", "yes_occasional": "occasional"}.get(freq, "none")
     try:
@@ -179,6 +185,7 @@ def build_labels(asset):
     choices["_yesno"] = [("1", "Yes"), ("0", "No")]
     choices["_age_group"] = AGE_GROUPS
     choices["_earning_status"] = EARNING_STATUS
+    choices["_post_support"] = POST_SUPPORT
     return choices, field_list
 
 

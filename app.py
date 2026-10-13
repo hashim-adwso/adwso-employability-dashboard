@@ -89,6 +89,169 @@ EXPLAIN = {
     "method": "Whether the interview was done in person or by phone.",
 }
 
+# Detailed notes shown under every chart: the question asked, who answered it, how to read it and what to keep in mind.
+NOTES = {
+    "pathway": dict(
+        q="Q8. What is your current employment/livelihood status?",
+        who="All graduates included in the dashboard.",
+        read="The interviewer chooses one of eight answers, which are grouped into five pathways: "
+             "A. Own business = self-employed, business group or business partnership; "
+             "B. Paid job = employed by another person or company, or paid work with the Master Trainer; "
+             "C. Apprenticeship = still learning with a master, not regular paid work; "
+             "D. Another field = working, but not in the trained vocation; E. Not working.",
+        note="The pathway describes the graduate's main activity on the day of the interview, not their whole history "
+             "since the training. Most later questions are asked only to graduates in certain pathways."),
+    "earning_status": dict(
+        q="Q16. How often do you earn income from the vocational skills you learned in the training? "
+          "(Path D graduates are first asked Q16a: do you still earn any income from the trained vocation?)",
+        who="All graduates. Graduates in Paths C and E are not asked Q16 and are counted as not earning from the trade.",
+        read="Regularly = every week or every month. Occasionally = from time to time, not every month. "
+             "Not earning = Paths C and E, plus Path D graduates who said they earn nothing from the trade.",
+        note="Every graduate in Paths A and B earns from the trade, because the form does not offer “not earning” to "
+             "them. So “earning from the trade” is almost the same as Paths A + B; it is higher only when some Path D "
+             "graduates also earn from the trade on the side."),
+    "earning_freq": dict(
+        q="Q16. How often do you earn income from the vocational skills you learned in the training?",
+        who="Only graduates who earn from their trade (Paths A and B, and Path D graduates who still earn from the trade).",
+        read="Shows how steady the income is for those who earn. Regular income is a stronger sign of a lasting livelihood.",
+        note="Percentages are of earners only, not of all graduates. See the “Earning from the trained vocation” chart "
+             "for shares of all graduates."),
+    "trade_income": dict(
+        q="Q16a. Besides your current work, do you still earn any income from the vocation you were trained in, even a small amount?",
+        who="Only Path D graduates (main work is in another field).",
+        read="Yes = the trained skill still brings some income alongside their main work.",
+        note="This group is small, so its answers are often hidden to protect privacy."),
+    "monthly_income": dict(
+        q="Q18. Approximately how much do you earn per month from your trained vocation?",
+        who="Only graduates who earn from their trade.",
+        read="Income bands in Afghani (AFN), as estimated by the graduate. It is income from the trade only, not total household income.",
+        note="Figures are self-reported estimates. Graduates who earn only occasionally may report an average or a typical month."),
+    "time_to_income": dict(
+        q="Q17. How long after completing the training did you start earning from these skills?",
+        who="Only graduates who earn from their trade.",
+        read="How quickly graduates first earned money from the skill after the training ended.",
+        note="Graduates who have never earned from the trade are not included, so this does not show how many are still waiting."),
+    "income_change": dict(
+        q="Q19. Compared with before the training, how has your personal/family income changed as a result of your vocational work?",
+        who="Only graduates who earn from their trade.",
+        read="The graduate's own view of how their income changed because of the work they do with the new skill.",
+        note="This is a perception, not a measured income. When one answer has fewer than 5 graduates, a second answer is "
+             "also hidden so the small number cannot be worked out."),
+    "income_use": dict(
+        q="Q20. What do you mainly use your vocational income for? (select all that apply)",
+        who="Only graduates who earn from their trade.",
+        read="Each bar is the share of earners who mentioned that use. Several answers were allowed.",
+        note="Because several answers were allowed, the bars add up to more than 100%."),
+    "workplace": dict(
+        q="Q9. Where do you mainly work?",
+        who="Only Path A (own business) and Path B (paid job) graduates.",
+        read="The main place where the graduate does their work.",
+        note="Working at home is common for girls and for small-scale work such as sewing and embroidery."),
+    "find_customers": dict(
+        q="Q11. How do you currently find customers or work? (select all that apply)",
+        who="Only Path A graduates (own business).",
+        read="Each bar is the share of business owners who use that way of finding customers. Several answers were allowed.",
+        note="Bars add up to more than 100%. Heavy reliance on family and neighbours suggests a small, local customer base."),
+    "repeat_customers": dict(
+        q="Q14. Have you received repeat customers or repeat orders?",
+        who="Only Path A graduates who have customers.",
+        read="Repeat customers show that the business is trusted and is likely to last.",
+        note=""),
+    "appr_place": dict(
+        q="Q8.1 Where are you currently continuing your apprenticeship?",
+        who="Only Path C graduates (apprentices).",
+        read="Where apprentices are still learning the trade.",
+        note=""),
+    "appr_allowance": dict(
+        q="Q8.2 Do you receive any payment or allowance during your apprenticeship?",
+        who="Only Path C graduates (apprentices).",
+        read="Yes = the apprentice receives some money while learning, even if it is not a regular wage.",
+        note="Apprentices who receive regular pay for their work should be recorded as Path B, not Path C."),
+    "past_work": dict(
+        q="Q8.3 Since graduating from the vocational training, have you worked or earned any income using the skills you learned?",
+        who="Only Path E graduates (not working at the moment).",
+        read="Shows whether graduates without work today have ever used the skill to earn since the training.",
+        note="A high “No” means most graduates who are not working now have never started work after the training."),
+    "reason_not_in_trade": dict(
+        q="Q10. What are the reasons you are not currently working in your trained vocation? (select all that apply)",
+        who="Path D (working in another field) and Path E (not working) graduates together.",
+        read="Each bar is the share of these graduates who gave that reason. Several answers were allowed.",
+        note="Bars add up to more than 100%. The two groups are combined; use the filters to look at smaller groups."),
+    "market_challenges": dict(
+        q="Q15. What are the main challenges you face in finding customers, work or market access? (select all that apply)",
+        who="Path A (own business) and Path E (not working) graduates together.",
+        read="Each bar is the share of these graduates who named that challenge. Several answers were allowed.",
+        note="Business owners and graduates without work are combined, so the chart mixes challenges of running a business "
+             "with challenges of finding work. Bars add up to more than 100%."),
+    "toolkit_reason": dict(
+        q="Q22. What are the reasons you are not using the toolkit regularly? (select all that apply)",
+        who="Graduates who use the toolkit sometimes, rarely or not at all (Q21).",
+        read="Each bar is the share of these graduates who gave that reason. Several answers were allowed.",
+        note="Bars add up to more than 100%."),
+    "toolkit_use": dict(
+        q="Q21. Are you currently using the tools/equipment provided through the vocational training project?",
+        who="All graduates.",
+        read="The toolkit is the set of tools given to each graduate at the end of the training. "
+             "This chart shows how often it is used today.",
+        note="This is the only chart about the end-of-training toolkit. “Did not receive a toolkit” is 0%, which confirms "
+             "that all graduates received one."),
+    "toolkit_how": dict(
+        q="Q21.1 How are you using the toolkit? (select all that apply)",
+        who="Graduates who use the toolkit regularly, sometimes or rarely.",
+        read="Each bar is the share of toolkit users who use it in that way. Several answers were allowed.",
+        note="Bars add up to more than 100%."),
+    "post_support": dict(
+        q="Q23. Did you receive any support after completing the training to help you find work, customers, or access markets?",
+        who="All graduates.",
+        read="Yes = the graduate received some help after the training ended. “Don't know” answers are counted with “No”, "
+             "because they were very few and showing them separately would hide the main figures.",
+        note="Support given during the training (for example the business awareness sessions or the toolkit) should not be "
+             "counted here. Large differences between provinces may partly reflect how interviewers understood this question."),
+    "post_support_type": dict(
+        q="Q24. What type of support did you receive? (select all that apply)",
+        who="Only graduates who answered Yes to Q23 (received support after the training).",
+        read="Each bar is the share of those graduates who received that type of support. "
+             "“Additional tools/equipment (after training)” means extra tools received after the training – it is not the "
+             "toolkit every graduate received at the end of the training (see Q21).",
+        note="Percentages are of graduates who received support, not of all graduates. Several answers were allowed, so the "
+             "bars add up to more than 100%."),
+    "support_needed": dict(
+        q="Q27. What is the most important support you need to continue or expand your work/business? (select all that apply)",
+        who="All graduates.",
+        read="Each bar is the share of graduates who said they need that support. Several answers were allowed.",
+        note="Bars add up to more than 100%. This shows needs as graduates see them, which can guide follow-up support."),
+    "plans_3_6m": dict(
+        q="Q25. What is your main plan for the next 3–6 months?",
+        who="All graduates.",
+        read="The graduate's main plan for the near future. Only one answer was allowed.",
+        note="Plans are intentions, not results. Interviewers were asked to check plans that did not fit the current pathway."),
+    "continue_trade": dict(
+        q="Q26. Do you plan to continue working in the vocation you were trained in during the next year?",
+        who="All graduates.",
+        read="Definitely or probably yes = the graduate expects to keep working in, or start working in, the trained vocation.",
+        note="Graduates who are not working today may still say yes, because they hope to start."),
+    "vt_benefit": dict(
+        q="Q28. Overall, how would you describe the benefit of the vocational training to your current livelihood?",
+        who="All graduates.",
+        read="Very beneficial = earning or established work; Beneficial = using the skills, but income is still limited; "
+             "Somewhat beneficial = has the skills but not enough work yet; Not beneficial = not using the skills.",
+        note="This is the graduate's own view. The form checks it against the earning answers and asks the interviewer to "
+             "confirm when they do not match."),
+    "monitor_assessment": dict(
+        q="Q29. [Monitor only – not read aloud] Monitor's overall assessment of the beneficiary's current employability status",
+        who="All graduates – answered by the interviewer, not by the graduate.",
+        read="The interviewer's independent judgement of the graduate's situation after the whole interview.",
+        note="Useful to compare with the graduate's own answers: large differences may point to answers that need checking."),
+    "method": dict(
+        q="Monitoring method",
+        who="All graduates.",
+        read="Whether the interview was done in person (field visit) or by phone.",
+        note="Phone interviews were used where a visit was not possible."),
+}
+
+# Display-only label changes (the KoBo form labels stay as they are).
+LABEL_OVERRIDES = {"post_support_type": {"tools": "Additional tools/equipment (after training)"}}
+
 st.markdown(f"""
 <style>
   [data-testid="stSidebar"], [data-testid="stSidebarCollapsedControl"], [data-testid="collapsedControl"] {{display:none;}}
@@ -199,6 +362,9 @@ if S is None:
     S = file_summary(SUMMARY.stat().st_mtime)
 
 META = S["meta"]
+for _k, _labels in LABEL_OVERRIDES.items():
+    for _o in META.get(_k, {}).get("options", []):
+        _o["label"] = _labels.get(_o["code"], _o["label"])
 MIN_CELL, MIN_GROUP = S["rules"]["min_cell"], S["rules"]["min_group"]
 DIMS = {"province": "Province", "gender": "Gender", "age_group": "Age group"}
 
@@ -439,6 +605,7 @@ def card(key, d=None, title=None, explain=None):
         if ind.get("too_few"):
             st.markdown(f"<div class='ep-card-sub'>Base: {meta['base']}</div>", unsafe_allow_html=True)
             st.info(f"Fewer than {MIN_GROUP} graduates answered this for the current selection.")
+            notes_box(key)
             return
         sub = f"Base: {meta['base']} · n = {ind['all']['n']}"
         if meta["multi"]:
@@ -450,6 +617,16 @@ def card(key, d=None, title=None, explain=None):
             chart_overall(key, meta, ind)
         else:
             chart_breakdown(key, meta, ind, d)
+        notes_box(key)
+
+
+def notes_box(key):
+    nt = NOTES.get(key)
+    if not nt:
+        return
+    with st.expander("About this chart – question asked, who answered and how to read it"):
+        st.markdown(f"**Question asked:** {nt['q']}\n\n**Who answered:** {nt['who']}\n\n"
+                    f"**What the answers mean:** {nt['read']}" + (f"\n\n**Keep in mind:** {nt['note']}" if nt['note'] else ""))
 
 
 def section(title):
@@ -556,6 +733,20 @@ with tabs[0]:
         f"<div class='ep-kpi' style='border-bottom:4px solid {col}'><div class='lbl'>{lbl}</div>"
         f"<div class='val'>{val}</div><div class='sub'>{sub}</div><div class='what'>{what}</div></div>"
         for lbl, val, sub, what, col in kpis) + "</div>", unsafe_allow_html=True)
+    with st.expander("About these figures – which questions they come from"):
+        st.markdown("""
+- **Graduates assessed** – interviews where consent was given (the graduate's own agreement, and a parent's or
+  guardian's consent for graduates under 18). Interviews marked “Not approved” in ADWSO's quality review are excluded.
+- **Earning from their trade** – Q16 / Q16a: graduates who earn money from the trained vocation regularly or
+  occasionally. This covers all of Paths A and B, plus Path D graduates who still earn from the trade on the side.
+- **Earning regularly** – Q16: graduates who earn from the trade every week or every month.
+- **Say the training helped** – Q28: graduates who rated the training “very beneficial” or “beneficial” for their
+  livelihood. “Somewhat beneficial” is not counted.
+- **Plan to stay in the trade** – Q26: graduates who will “definitely” or “probably” keep working in the trained
+  vocation next year. This includes graduates who are not working today but hope to start.
+
+All figures are percentages of all graduates in the current selection.
+""")
 
     section("Where are the graduates now? The five pathways")
     with st.container(border=True, key="card_paths"):
@@ -585,6 +776,7 @@ with tabs[0]:
                     + (f"<div class='ep-card-sub'>Out of every 10 graduates, about {'; '.join(phrases)}.</div>"
                        if phrases else "")
                     + f"<div class='ep-paths'>{''.join(tiles)}</div>", unsafe_allow_html=True)
+        notes_box("pathway")
 
     section("Key findings")
     with st.container(border=True, key="card_findings"):
@@ -631,6 +823,13 @@ with tabs[0]:
                         f"<div class='ep-card-sub'>Trades with at least {MIN_CELL} graduates are listed; a trade needs "
                         f"at least {MIN_GROUP} graduates before its result is shown.</div>", unsafe_allow_html=True)
             chart_rate("is_earning", ["1"], "vocation", "Earning from the trade")
+            with st.expander("About this chart – question asked, who answered and how to read it"):
+                st.markdown("**Questions used:** Vocational trade completed, and Q16 / Q16a (earning from the trained "
+                            "vocation).\n\n**Who answered:** All graduates, grouped by the trade they completed.\n\n"
+                            "**What the bars mean:** For each trade, the share of its graduates who earn money from that "
+                            "trade, regularly or occasionally.\n\n**Keep in mind:** Trades with few graduates can change a "
+                            "lot as more interviews come in. A grey bar means the trade has too few graduates, or that one "
+                            "of its figures is below 5, so its result is hidden to protect privacy.")
         st.caption("Tip: use **Compare results by** above to split these figures by province, gender or age group.")
 
 # ---------------------------------------------------------------- pathways & work
