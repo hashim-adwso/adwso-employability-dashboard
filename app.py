@@ -366,7 +366,10 @@ for _k, _labels in LABEL_OVERRIDES.items():
     for _o in META.get(_k, {}).get("options", []):
         _o["label"] = _labels.get(_o["code"], _o["label"])
 MIN_CELL, MIN_GROUP = S["rules"]["min_cell"], S["rules"]["min_group"]
-DIMS = {"province": "Province", "gender": "Gender", "age_group": "Age group"}
+# Filter dimensions, in the same order as the view keys built by aggregate.py. A dimension missing from an older
+# summary (e.g. the donor filter before it was added) is simply left out.
+DIMS = {k: v for k, v in {"province": "Province", "gender": "Gender", "age_group": "Age group", "fund": "Donor"}.items()
+        if k in S.get("filters", {})}
 
 
 def kabul_time(summary):
@@ -440,8 +443,8 @@ for k in DIMS:
 st.session_state.setdefault("compare", "all")
 
 with st.container(border=True, key="card_filters"):
-    cols = st.columns([1.2, 1, 1, 1.2, 0.8])
-    for col, (k, name) in zip(cols[:3], DIMS.items()):
+    cols = st.columns([1.1] + [1] * (len(DIMS) - 1) + [1.2, 0.8])
+    for col, (k, name) in zip(cols[:len(DIMS)], DIMS.items()):
         opts = ["*"] + [o["code"] for o in S["filters"].get(k, [])]
         labels = {"*": "All", **{o["code"]: o["label"] for o in S["filters"].get(k, [])}}
         if st.session_state[f"f_{k}"] not in opts:  # a filter value can disappear after a refresh
@@ -451,11 +454,11 @@ with st.container(border=True, key="card_filters"):
     compare_opts = ["all"] + [k for k in DIMS if k not in fixed]
     if st.session_state["compare"] not in compare_opts:
         st.session_state["compare"] = "all"
-    cols[3].selectbox("COMPARE RESULTS BY", compare_opts,
+    cols[-2].selectbox("COMPARE RESULTS BY", compare_opts,
                       format_func=lambda k: "No comparison" if k == "all" else DIMS[k], key="compare",
-                      help="Split every chart by province, gender or age group.")
-    cols[4].markdown("<div style='height:1.7rem'></div>", unsafe_allow_html=True)
-    cols[4].button("Reset filters", on_click=reset_filters, width="stretch", type="primary")
+                      help="Split every chart by province, gender, age group or donor.")
+    cols[-1].markdown("<div style='height:1.7rem'></div>", unsafe_allow_html=True)
+    cols[-1].button("Reset filters", on_click=reset_filters, width="stretch", type="primary")
 
 with st.expander("How to read this dashboard"):
     st.markdown(f"""
@@ -471,7 +474,10 @@ with st.expander("How to read this dashboard"):
 - **Questions with several answers** (marked *more than one answer allowed*) can add up to more than 100%.
 - **Privacy:** “<{MIN_CELL}” means fewer than {MIN_CELL} graduates; grey “Not shown” bars hide small numbers. A group of
   fewer than {MIN_GROUP} graduates shows only its size, never its answers.
-- **Compare results by** splits each chart by province, gender or age group; each bar is then 100% of that group.
+- **Donor** is the funding source of the graduate's training, as recorded in the questionnaire (ADB, EU or TLF).
+- **Compare results by** splits each chart by province, gender, age group or donor; each bar is then 100% of that group.
+- Some filter combinations are not shown even when they have 10 or more graduates: if the graduates left out of a
+  filter would be a group of fewer than 10, they could be worked out by comparing two views, so that view is withheld.
 """)
 
 vkey = "|".join(st.session_state[f"f_{k}"] for k in DIMS)
@@ -484,8 +490,13 @@ sel_parts = [next(o["label"] for o in S["filters"][k] if o["code"] == st.session
 sel_txt = ", ".join(sel_parts) if sel_parts else "all graduates"
 
 if V is None:
-    st.warning(f"Only {n_sel} graduate(s) match **{sel_txt}**. To protect privacy, results are shown only when at "
-               f"least {MIN_GROUP} graduates match. Please widen the filters.")
+    if n_sel < MIN_GROUP:
+        st.warning(f"Only {n_sel} graduate(s) match **{sel_txt}**. To protect privacy, results are shown only when at "
+                   f"least {MIN_GROUP} graduates match. Please widen the filters.")
+    else:
+        st.warning(f"**{sel_txt}** ({n_sel} graduates) cannot be shown: the graduates this selection leaves out form a "
+                   f"group of fewer than {MIN_GROUP}, whose answers could otherwise be worked out by comparison. "
+                   f"Please change or widen the filters.")
     st.stop()
 
 
@@ -547,7 +558,7 @@ def group_label(g):
 def table_breakdown(meta, groups):
     data = {"Answer": [o["label"] for o in meta["options"]]}
     for g in groups:
-        data[group_label(g)] = [fmt(g["counts"].get(o["code"]), g["n"]) if g["n"] >= MIN_GROUP else "–"
+        data[group_label(g)] = [fmt(g["counts"].get(o["code"]), g["n"]) if g["n"] >= MIN_GROUP and not g.get("hidden") else "–"
                                 for o in meta["options"]]
     df = pd.DataFrame(data)
     if meta["multi"]:
@@ -830,7 +841,7 @@ All figures are percentages of all graduates in the current selection.
                             "trade, regularly or occasionally.\n\n**Keep in mind:** Trades with few graduates can change a "
                             "lot as more interviews come in. A grey bar means the trade has too few graduates, or that one "
                             "of its figures is below 5, so its result is hidden to protect privacy.")
-        st.caption("Tip: use **Compare results by** above to split these figures by province, gender or age group.")
+        st.caption("Tip: use **Compare results by** above to split these figures by province, gender, age group or donor.")
 
 # ---------------------------------------------------------------- pathways & work
 with tabs[1]:
@@ -920,7 +931,9 @@ refreshed every 6 hours is used as a back-up if KoBo cannot be reached.
 level, photos or individual answers. Any figure based on fewer than {MIN_CELL} graduates is shown as
 "<{MIN_CELL}". For any group of fewer than {MIN_GROUP} graduates – for example a province with only a few
 interviews – only the number of graduates is shown, not their answers. A filter selection is shown only when at
-least {MIN_GROUP} graduates match.
+least {MIN_GROUP} graduates match, and only when the graduates it leaves out are either none or at least {MIN_GROUP}.
+When one group in a comparison is too small to show, one more group is also hidden, so the small group's answers
+cannot be worked out by subtraction.
 """)
     card("method", "all")
 

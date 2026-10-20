@@ -16,6 +16,7 @@ Offline test:
     python aggregate.py --asset asset.json --data submissions.json
 """
 import argparse
+import itertools
 import datetime as dt
 import json
 import os
@@ -33,7 +34,7 @@ MIN_GROUP = 10  # a filtered view (e.g. one province) needs at least 10 responde
 
 # Only these fields are read from each submission. Everything else is discarded.
 KEEP = {
-    "province", "gender", "age", "vocation", "consent_ok", "pathway", "is_earning", "earning_freq",
+    "province", "gender", "age", "vocation", "fund", "consent_ok", "pathway", "is_earning", "earning_freq",
     "trade_income", "time_to_income", "monthly_income", "income_change", "income_use",
     "reason_not_in_trade", "market_challenges", "workplace", "find_customers", "repeat_customers",
     "has_customers", "appr_place", "appr_allowance", "past_work", "toolkit_use", "toolkit_how",
@@ -120,7 +121,7 @@ INDICATORS = [
     ("monitor_assessment", "monitor_assessment", None, False, None, "All respondents",
      "Monitor's assessment of employability", "outlook"),
 ]
-BREAKDOWNS = ["province", "gender", "age_group"]
+BREAKDOWNS = ["province", "gender", "age_group", "fund"]  # order = order of the view key
 VOCATION_INDICATORS = {"pathway", "is_earning", "earning_status"}
 
 
@@ -234,6 +235,18 @@ def group_rows(rows, dim, order):
     return groups
 
 
+def protect_groups(groups):
+    """If exactly one group in a breakdown is too small to show (1 to MIN_GROUP-1), the answers of one more group
+    are hidden too, so the small group's answers cannot be worked out as 'total minus the other groups'."""
+    small = [g for g in groups if 0 < g["n"] < MIN_GROUP]
+    if len(small) == 1:
+        others = sorted((g for g in groups if g["n"] >= MIN_GROUP), key=lambda g: g["n"])
+        if others:
+            others[0]["counts"] = {k: None for k in others[0]["counts"]}
+            others[0]["hidden"] = True
+    return groups
+
+
 def summarise(rows, field, multi, codes):
     return {"n": len(rows), "counts": suppress_cells(tabulate(rows, field, multi, codes), multi, len(rows))}
 
@@ -265,12 +278,14 @@ def build_summary(asset, raw):
         "gender": [c for c, _ in choices.get(field_list.get("gender", ""), [])],
         "age_group": [c for c, _ in AGE_GROUPS],
         "vocation": [c for c, _ in choices.get(field_list.get("vocation", ""), [])],
+        "fund": [c for c, _ in choices.get(field_list.get("fund", ""), [])],
     }
     dim_labels = {
         "province": dict(choices.get(field_list.get("province", ""), [])),
         "gender": dict(choices.get(field_list.get("gender", ""), [])),
         "age_group": dict(AGE_GROUPS),
         "vocation": dict(choices.get(field_list.get("vocation", ""), [])),
+        "fund": dict(choices.get(field_list.get("fund", ""), [])),
     }
 
     def build_indicators(sub_rows, fixed):
@@ -285,8 +300,9 @@ def build_summary(asset, raw):
             ind = {"too_few": False, "all": summarise(base_rows, field, multi, codes), "by": {}}
             dims = [d for d in BREAKDOWNS if d not in fixed] + (["vocation"] if key in VOCATION_INDICATORS else [])
             for d in dims:
-                ind["by"][d] = [{"group": g, "label": dim_labels[d].get(g, g), **summarise(rs, field, multi, codes)}
-                                for g, rs in group_rows(base_rows, d, dim_order[d])]
+                ind["by"][d] = protect_groups(
+                    [{"group": g, "label": dim_labels[d].get(g, g), **summarise(rs, field, multi, codes)}
+                     for g, rs in group_rows(base_rows, d, dim_order[d])])
             out[key] = ind
         return out
 
@@ -296,20 +312,35 @@ def build_summary(asset, raw):
         meta[key] = {"title": title, "page": page, "base": base_desc, "multi": multi,
                      "options": [{"code": c, "label": l} for c, l in opts]}
 
-    # Pre-computed views for every filter combination: "province|gender|age_group", '*' = all.
+    # Pre-computed views for every filter combination "province|gender|age_group|fund" ('*' = all).
     present = {d: [g for g in dim_order[d] if any(r.get(d) == g for r in rows)] for d in BREAKDOWNS}
-    views, view_n = {}, {}
-    for p in ["*"] + present["province"]:
-        for g in ["*"] + present["gender"]:
-            for ag in ["*"] + present["age_group"]:
-                sub = [r for r in rows if (p == "*" or r.get("province") == p)
-                       and (g == "*" or r.get("gender") == g) and (ag == "*" or r.get("age_group") == ag)]
-                vkey = f"{p}|{g}|{ag}"
-                view_n[vkey] = len(sub)
-                if len(sub) < MIN_GROUP:
-                    continue
-                fixed = {d for d, v in zip(BREAKDOWNS, (p, g, ag)) if v != "*"}
-                views[vkey] = build_indicators(sub, fixed)
+    combos = list(itertools.product(*[["*"] + present[d] for d in BREAKDOWNS]))
+    view_n = {}
+    for combo in combos:
+        view_n["|".join(combo)] = sum(all(v == "*" or r.get(d) == v for d, v in zip(BREAKDOWNS, combo)) for r in rows)
+
+    def publishable(combo):
+        """A view needs at least MIN_GROUP graduates. In addition, for every filter that is set, the graduates left
+        out of it (e.g. Balkh minus Balkh-ADB) must be 0 or at least MIN_GROUP, otherwise the answers of that small
+        remainder could be worked out by subtracting two published views."""
+        n = view_n["|".join(combo)]
+        if n < MIN_GROUP:
+            return False
+        for i, v in enumerate(combo):
+            if v != "*":
+                parent = list(combo)
+                parent[i] = "*"
+                rest = view_n["|".join(parent)] - n
+                if 0 < rest < MIN_GROUP:
+                    return False
+        return True
+
+    views = {}
+    for combo in combos:
+        if publishable(combo):
+            sub = [r for r in rows if all(v == "*" or r.get(d) == v for d, v in zip(BREAKDOWNS, combo))]
+            fixed = {d for d, v in zip(BREAKDOWNS, combo) if v != "*"}
+            views["|".join(combo)] = build_indicators(sub, fixed)
 
     days = sorted(r["_day"] for r in rows if r["_day"])
     now = dt.datetime.now(dt.timezone.utc)
@@ -322,7 +353,8 @@ def build_summary(asset, raw):
         "n_excluded_review": excluded_review if excluded_review >= MIN_CELL or excluded_review == 0 else None,
         "n_no_consent": no_consent if no_consent >= MIN_CELL or no_consent == 0 else None,
         "rules": {"min_cell": MIN_CELL, "min_group": MIN_GROUP},
-        "dimensions": {"province": "Province", "gender": "Gender", "age_group": "Age group", "vocation": "Vocation"},
+        "dimensions": {"province": "Province", "gender": "Gender", "age_group": "Age group", "fund": "Donor",
+                       "vocation": "Vocation"},
         "filters": {d: [{"code": c, "label": dim_labels[d].get(c, c)} for c in present[d]] for d in BREAKDOWNS},
         "meta": meta,
         "view_n": view_n,

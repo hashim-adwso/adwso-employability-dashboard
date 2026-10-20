@@ -15,7 +15,10 @@ KoBoToolbox ──(API token, GitHub secret)──► aggregate.py ──► dat
 * Raw submissions exist only in memory during the run; they are never written to the repository.
 * Groups (e.g. provinces) are never merged. Any figure based on 1–4 graduates is shown as "<5" (with a second
   figure hidden where needed so it cannot be worked out from the total). For any group of fewer than 10 graduates
-  only its size is shown, never its answers. A filter selection is shown only when at least 10 graduates match.
+  only its size is shown, never its answers (and if only one group in a comparison is that small, one more
+  group is hidden too). A filter selection (province, gender, age group, donor) is shown only when at least 10
+  graduates match and the graduates it leaves out are none or at least 10, so no small group can be worked out by
+  comparing two views.
 * Submissions marked **Not approved** in KoBo, and interviews without consent, are excluded.
 * **Live mode (optional, recommended):** if the Streamlit secret `KOBO_TOKEN` is set, `app.py` downloads the
   submissions itself, aggregates them in memory with the same rules (`aggregate.build_summary`) and keeps only the
